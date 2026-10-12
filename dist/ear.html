@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111415">
+  <meta name="description" content="音を聴いて、指板で再現するギター耳コピトレーニング。">
+  <title>耳コピ — FRET ATLAS</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="ear.css?v=20261012-audit">
+</head>
+<body>
+<div class="app-shell">
+  <header class="app-header">
+    <div class="page-heading"><a class="icon-button back-link" href="./" aria-label="FRET ATLASへ戻る"><img src="ear-icons/back.svg" alt="" width="20" height="20"></a><h1>耳コピ</h1></div>
+    <div class="header-actions"><span class="session-record" aria-label="初回で正解した数と終了した問題数" title="最初の回答で正解した数 / 終えた問題数"><span class="record-label">初回正解</span><strong id="clean-count">0</strong><span class="record-divider">/</span><span id="completed-count">0</span></span><button class="icon-button" id="settings-open" type="button" aria-label="練習設定"><img src="ear-icons/settings.svg" alt="" width="21" height="21"></button></div>
+  </header>
+  <main>
+    <section class="trainer" aria-label="耳コピトレーニング">
+      <div class="prompt-bar">
+        <div class="prompt-topline"><div class="prompt-meta"><p class="question-label" id="question-label">お題 01</p><span id="prompt-beats" class="prompt-beats" aria-hidden="true"></span></div><div class="segments" aria-label="音の数"><button type="button" data-level="single" aria-pressed="true">1音</button><button type="button" data-level="pair" aria-pressed="false">2音</button><button type="button" data-level="triple" aria-pressed="false">3音</button><button type="button" data-level="phrase" aria-pressed="false">4音</button></div></div>
+        <div class="listen-controls"><button class="listen-button" id="listen" type="button"><img src="ear-icons/play.svg" alt="" width="17" height="17"><span id="listen-label">お題を聴く</span><kbd>Space</kbd></button><button class="compare-button" id="compare" type="button" title="お題 → 回答の順に再生" aria-label="お題と回答を聴き比べる" disabled><img src="ear-icons/compare.svg" alt="" width="18" height="18"><span>聴き比べ</span></button></div>
+      </div>
+      <div class="board-area">
+        <div class="board-heading"><div class="segments board-views" role="group" aria-label="指板の表示"><button type="button" data-board-view="detail" aria-pressed="true" aria-controls="fretboard">拡大</button><button type="button" data-board-view="overview" aria-pressed="false" aria-controls="fretboard">全体</button></div><span id="board-instruction"></span><span id="playback-status" aria-live="off"></span></div>
+        <div class="board-scroll" id="board-scroll" tabindex="-1"><div class="fretboard" id="fretboard" role="group" aria-label="標準チューニングのギター指板"></div></div>
+        <div class="board-foot"><span id="touched-note"></span><span class="range-note" id="range-note">全弦 · 0–5F</span></div>
+      </div>
+      <div class="take-bar">
+        <div class="answer-slots" id="answer-slots" aria-label="回答する音"></div>
+      </div>
+      <div class="result-bar">
+        <div class="feedback" id="feedback" role="status" aria-live="polite" hidden><span class="feedback-mark" id="feedback-mark" aria-hidden="true" hidden></span><div><strong id="feedback-title"></strong><p id="feedback-detail" hidden></p><div class="answer-key" id="answer-key" hidden></div></div></div>
+        <div class="result-actions"><div class="take-actions"><button class="icon-button" id="replay-answer" type="button" aria-label="回答を聴く" title="回答を聴く" disabled><img src="ear-icons/speaker.svg" alt="" width="20" height="20"></button><button class="icon-button" id="clear-answer" type="button" aria-label="入力を1つ戻す" title="入力を1つ戻す" disabled><img src="ear-icons/undo.svg" alt="" width="19" height="19"></button></div><button type="button" class="quiet-button" id="reveal" disabled>答えを見る</button><button type="button" class="primary-button" id="check" disabled>答え合わせ</button><button type="button" class="primary-button" id="next" hidden>次へ</button></div>
+        <span id="action-hint" class="sr-only"></span>
+      </div>
+    </section>
+  </main>
+</div>
+<dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+  <div class="dialog-header"><h2 id="settings-title">練習設定</h2><button id="settings-close" class="icon-button" type="button" aria-label="設定を閉じる"><img src="ear-icons/close.svg" alt="" width="20" height="20"></button></div>
+  <label class="setting-row"><span>探す範囲</span><select id="range-select"><option value="first">1弦・0〜5フレット</option><option value="low" selected>全弦・0〜5フレット</option><option value="full">全弦・0〜12フレット</option><option value="extended">全弦・0〜22フレット</option></select></label>
+  <label class="setting-row volume-setting"><span>音量</span><input id="volume" type="range" min="0.1" max="0.8" step="0.05" value="0.45" aria-label="音量"></label>
+  <label class="setting-row speed-setting"><span>再生の速さ</span><select id="speed-select"><option value="1">標準</option><option value="0.7">ゆっくり</option></select></label>
+  <p id="settings-storage" class="settings-error" role="status" hidden></p>
+</dialog>
+<script type="module" src="ear.js?v=20261012-audit"></script>
+</body>
+</html>

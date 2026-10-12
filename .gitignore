@@ -1,0 +1,11 @@
+.DS_Store
+*.tar.gz
+node_modules/
+_site/
+.openai/
+.codex/
+.agents/
+AGENTS.md
+audits/
+.env
+.env.*

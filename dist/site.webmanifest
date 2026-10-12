@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "FRET ATLAS — ギター耳コピ",
+  "short_name": "FRET ATLAS",
+  "description": "聴いて、指板で再現。ギターがなくてもできる耳コピトレーニング。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111415",
+  "theme_color": "#111415",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
