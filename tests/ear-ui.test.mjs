@@ -90,8 +90,12 @@ function answerVerdicts(app) {
 for (const level of ['single', 'pair', 'triple', 'phrase']) {
   test(`${level}: a complete answer can be checked without a completed prompt playback`, async () => {
     const app = screen(level);
+    const counts = ['clean-count', 'completed-count'].map(id => app.get(id).textContent);
     assert.equal(app.get('check').disabled, true);
     for (const position of app.target) await app.enter(position);
+    assert.equal(app.get('feedback').hidden, true);
+    assert.deepEqual(answerVerdicts(app), app.target.map(() => null));
+    assert.deepEqual(['clean-count', 'completed-count'].map(id => app.get(id).textContent), counts);
     await app.click('check');
     assert.equal(app.get('feedback-title').textContent, '正解');
     assert.equal(app.get('feedback-mark').hidden, false);
@@ -150,13 +154,72 @@ test('grading during comparison cancels playback without overwriting the result'
   assert.equal(app.get('next').hidden, false);
 });
 
-test('single notes still grade on tap after the prompt plays', async () => {
+test('single-note fret taps and playback never grade, even when an audition happens to match', async () => {
+  const app = screen('single');
+  const counts = ['clean-count', 'completed-count'].map(id => app.get(id).textContent);
+  function assertUngraded() {
+    assert.equal(app.get('feedback').hidden, true);
+    assert.equal(app.get('feedback-mark').hidden, true);
+    assert.deepEqual(answerVerdicts(app), [null]);
+    assert.equal(app.get('check').disabled, false);
+    assert.equal(app.get('check').hidden, false);
+    assert.equal(app.get('next').hidden, true);
+    assert.deepEqual(['clean-count', 'completed-count'].map(id => app.get(id).textContent), counts);
+  }
+  await app.click('listen');
+  await app.finishPlayback();
+  const distinctPitches = new Map(app.exercise.positions.map(position => [position.midi, position]));
+  for (const position of distinctPitches.values()) {
+    await app.enter(position);
+    assertUngraded();
+  }
+  // Finding the target must not end the question or freeze the answer.
+  await app.enter(app.target[0]);
+  const other = app.exercise.positions.find(position => position.midi !== app.target[0].midi);
+  await app.enter(other);
+  assert.match(app.get('answer-slots').innerHTML, new RegExp(`、${other.string}弦 ${other.fret === 0 ? '開放' : `${other.fret}F`}を編集`));
+  assertUngraded();
+  await app.enter(app.target[0]);
+  for (const control of ['listen', 'replay-answer', 'compare']) {
+    await app.click(control);
+    await app.finishPlayback();
+    assertUngraded();
+  }
+  await app.click('check');
+  assert.equal(app.get('feedback-title').textContent, '正解');
+  assert.deepEqual(answerVerdicts(app), ['○']);
+  assert.equal(app.get('clean-count').textContent, 1);
+  assert.equal(app.get('completed-count').textContent, 1);
+  assert.equal(app.get('next').hidden, false);
+  app.get('check').handlers.click(); // A duplicate submitted event cannot count twice.
+  await flush();
+  assert.equal(app.get('clean-count').textContent, 1);
+  assert.equal(app.get('completed-count').textContent, 1);
+});
+
+test('correcting a checked single note needs another explicit check and retains the unsuccessful attempt', async () => {
   const app = screen('single');
   await app.click('listen');
   await app.finishPlayback();
+  const wrong = app.exercise.positions.find(position => position.midi !== app.target[0].midi);
+  await app.enter(wrong);
+  await app.click('check');
+  assert.equal(app.get('feedback-title').textContent, '不正解');
+  assert.deepEqual(answerVerdicts(app), ['×']);
+  const counts = ['clean-count', 'completed-count'].map(id => app.get(id).textContent);
   await app.enter(app.target[0]);
+  await app.click('compare');
+  await app.finishPlayback();
+  assert.equal(app.get('feedback').hidden, true);
+  assert.deepEqual(answerVerdicts(app), [null]);
+  assert.equal(app.get('check').disabled, false);
+  assert.equal(app.get('next').hidden, true);
+  assert.deepEqual(['clean-count', 'completed-count'].map(id => app.get(id).textContent), counts);
+  await app.click('check');
   assert.equal(app.get('feedback-title').textContent, '正解');
-  assert.equal(app.get('next').hidden, false);
+  assert.deepEqual(answerVerdicts(app), ['○']);
+  assert.equal(app.get('completed-count').textContent, 1);
+  assert.equal(app.get('clean-count').textContent, 0, 'editing must not erase the unsuccessful explicit attempt');
 });
 
 test('an audio failure does not prevent checking an entered answer or revealing it', async () => {

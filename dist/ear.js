@@ -147,7 +147,7 @@ function renderControls() {
   $('#replay-answer').disabled = !filled;
   $('#clear-answer').disabled = !edits.length || settled;
   $('#compare').disabled = !filled;
-  $('#action-hint').textContent = settled ? '緑の位置が正解' : draft.length === 1 ? 'タップで判定' : '入力すると次の枠へ。枠を選んで1音ずつ直すこともできます。';
+  $('#action-hint').textContent = settled ? '緑の位置が正解' : draft.length === 1 ? '音を選んで答え合わせ' : '入力すると次の枠へ。枠を選んで1音ずつ直すこともできます。';
   $('#board-instruction').textContent = settled || draft.length === 1 ? '' : `入力 ${cursor + 1}/${draft.length}`;
 }
 
@@ -247,10 +247,7 @@ async function selectPosition(id) {
   const ok = await guitar.play(p.midi, { volume: Number($('#volume').value) });
   if (token !== generation || current !== exercise) return;
   if (!ok) audioError();
-  else {
-    audioRecovered();
-    if (heard && !settled && draft.length === 1) checkAnswer({ stopAudio: false });
-  }
+  else audioRecovered();
 }
 
 function finish(showedAnswer) {
@@ -269,9 +266,9 @@ function finish(showedAnswer) {
   $('#next').focus({ preventScroll: true });
 }
 
-function checkAnswer({ stopAudio = true } = {}) {
+function checkAnswer() {
   if (settled || !draft.every(Boolean)) return;
-  if (stopAudio) stop();
+  stop();
   results = gradeAnswer(exercise.target, draft);
   attempts++;
   if (results.correct) {
