@@ -1,4 +1,4 @@
-import { LEVELS, DIFFICULTIES } from './ear-model.js?v=20261013-pitch-span';
+import { LEVELS, DIFFICULTIES } from './ear-model.js?v=20261013-narrow-span';
 
 const STORAGE_KEY = 'guitar-ear-training.preferences.v1';
 export const DEFAULT_PREFERENCES = Object.freeze({ level: 'single', difficulty: 'normal', volume: 0.45, speed: 1, boardView: 'detail' });

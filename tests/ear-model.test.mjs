@@ -74,9 +74,9 @@ test('seeded random questions meet actual pitch-span bounds across every note co
 test('three frozen difficulty presets change audible phrase spans on the same full fretboard', () => {
   assert.equal(Object.isFrozen(DIFFICULTIES), true);
   assert.deepEqual(DIFFICULTIES, [
-    { id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 12 },
-    { id: 'normal', label: 'ふつう', minSpan: 13, maxSpan: 24 },
-    { id: 'hard', label: 'むずかしい', minSpan: 25, maxSpan: 46 },
+    { id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 9 },
+    { id: 'normal', label: 'ふつう', minSpan: 10, maxSpan: 16 },
+    { id: 'hard', label: 'むずかしい', minSpan: 17, maxSpan: 28 },
   ]);
   for (const difficulty of DIFFICULTIES) {
     assert.equal(Object.isFrozen(difficulty), true);
@@ -97,17 +97,23 @@ test('three frozen difficulty presets change audible phrase spans on the same fu
   assert.deepEqual(makeExercise().range, 'extended');
 });
 
-test('every advertised span is actually attainable, including low E2 to high D6', () => {
+test('every advertised span is attainable at both the low E2 and high D6 register boundaries', () => {
   for (const difficulty of DIFFICULTIES) {
     const count = difficulty.maxSpan - difficulty.minSpan + 1;
     for (const level of LEVELS.filter(item => item.length > 1)) {
       for (let span = difficulty.minSpan; span <= difficulty.maxSpan; span++) {
-        let calls = 0;
-        const rng = () => calls++ === 0 ? (span - difficulty.minSpan + 0.5) / count : 0;
-        const exercise = makeExercise({ difficulty: difficulty.id, level: level.id, rng });
-        assert.equal(spanOf(exercise), span);
-        assert.equal(Math.min(...pitches(exercise)), 40);
-        assert.equal(Math.max(...pitches(exercise)), 40 + span);
+        for (const register of ['lowest', 'highest']) {
+          let calls = 0;
+          const rng = () => {
+            const call = calls++;
+            if (call === 0) return (span - difficulty.minSpan + 0.5) / count;
+            return call === 1 && register === 'highest' ? 1 : 0;
+          };
+          const exercise = makeExercise({ difficulty: difficulty.id, level: level.id, rng });
+          assert.equal(spanOf(exercise), span);
+          assert.equal(Math.min(...pitches(exercise)), register === 'lowest' ? 40 : 86 - span);
+          assert.equal(Math.max(...pitches(exercise)), register === 'lowest' ? 40 + span : 86);
+        }
       }
     }
   }

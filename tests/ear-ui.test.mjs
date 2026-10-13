@@ -322,7 +322,7 @@ test('difficulty changes the audible span, cancels playback and preserves the fr
   const boardPositions = app.exercise.positions;
   await app.enter(app.target[0]);
   await app.click('compare');
-  for (const [difficulty, minSpan, maxSpan] of [['hard', 25, 46], ['easy', 1, 12], ['normal', 13, 24]]) {
+  for (const [difficulty, minSpan, maxSpan] of [['hard', 17, 28], ['easy', 1, 9], ['normal', 10, 16]]) {
     const completed = app.get('completed-count').textContent;
     await app.changeDifficulty(difficulty);
     assert.equal(app.exercise.difficulty, difficulty);
@@ -354,7 +354,7 @@ test('difficulty changes the audible span, cancels playback and preserves the fr
 test('the audio player receives the full question span for every multi-note difficulty', async () => {
   for (const level of ['pair', 'triple', 'phrase']) {
     const app = screen(level);
-    for (const [difficulty, minSpan, maxSpan] of [['easy', 1, 12], ['normal', 13, 24], ['hard', 25, 46]]) {
+    for (const [difficulty, minSpan, maxSpan] of [['easy', 1, 9], ['normal', 10, 16], ['hard', 17, 28]]) {
       await app.changeDifficulty(difficulty);
       app.played.length = 0;
       await app.click('listen');

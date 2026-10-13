@@ -16,9 +16,9 @@ export const RANGES = Object.freeze([
 ]);
 
 export const DIFFICULTIES = Object.freeze([
-  Object.freeze({ id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 12 }),
-  Object.freeze({ id: 'normal', label: 'ふつう', minSpan: 13, maxSpan: 24 }),
-  Object.freeze({ id: 'hard', label: 'むずかしい', minSpan: 25, maxSpan: 46 }),
+  Object.freeze({ id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 9 }),
+  Object.freeze({ id: 'normal', label: 'ふつう', minSpan: 10, maxSpan: 16 }),
+  Object.freeze({ id: 'hard', label: 'むずかしい', minSpan: 17, maxSpan: 28 }),
 ]);
 
 function pitch(value) {

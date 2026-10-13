@@ -1,8 +1,8 @@
 import { noteName, midiFor } from './pitch.js';
 import { GuitarAudio } from './audio.js';
-import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js?v=20261013-pitch-span';
+import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js?v=20261013-narrow-span';
 import { runSequence } from './ear-playback.js';
-import { loadPreferences, savePreferences } from './ear-preferences.js?v=20261013-pitch-span';
+import { loadPreferences, savePreferences } from './ear-preferences.js?v=20261013-narrow-span';
 
 const $ = selector => document.querySelector(selector);
 const guitar = new GuitarAudio();
