@@ -27,7 +27,7 @@
       <div class="board-area">
         <div class="board-heading"><div class="segments board-views" role="group" aria-label="指板の表示"><button type="button" data-board-view="detail" aria-pressed="true" aria-controls="fretboard">拡大</button><button type="button" data-board-view="overview" aria-pressed="false" aria-controls="fretboard">全体</button></div><span id="board-instruction"></span><span id="playback-status" aria-live="off"></span></div>
         <div class="board-scroll" id="board-scroll" tabindex="-1"><div class="fretboard" id="fretboard" role="group" aria-label="標準チューニングのギター指板"></div></div>
-        <div class="board-foot"><span id="touched-note"></span><span class="range-note" id="range-note">全弦 · 0–12F</span></div>
+        <div class="board-foot"><span id="touched-note"></span><span class="range-note" id="range-note">全弦 · 0–22F</span></div>
       </div>
       <div class="take-bar">
         <div class="answer-slots" id="answer-slots" aria-label="回答する音"></div>
@@ -46,6 +46,6 @@
   <label class="setting-row speed-setting"><span>再生の速さ</span><select id="speed-select"><option value="1">標準</option><option value="0.7">ゆっくり</option></select></label>
   <p id="settings-storage" class="settings-error" role="status" hidden></p>
 </dialog>
-<script type="module" src="ear.js?v=20261013-independent"></script>
+<script type="module" src="ear.js?v=20261013-pitch-span"></script>
 </body>
 </html>

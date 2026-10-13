@@ -1,13 +1,12 @@
-import { LEVELS, DIFFICULTIES } from './ear-model.js';
+import { LEVELS, DIFFICULTIES } from './ear-model.js?v=20261013-pitch-span';
 
 const STORAGE_KEY = 'guitar-ear-training.preferences.v1';
 export const DEFAULT_PREFERENCES = Object.freeze({ level: 'single', difficulty: 'normal', volume: 0.45, speed: 1, boardView: 'detail' });
 
 export function sanitizePreferences(raw) {
   const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const legacyDifficulty = value.range === 'first' || value.range === 'low' ? 'easy'
-    : value.range === 'extended' ? 'hard' : 'normal';
-  const difficulty = Object.hasOwn(value, 'difficulty') ? value.difficulty : legacyDifficulty;
+  // An old fretboard range says nothing about the requested listening difficulty.
+  const difficulty = value.difficulty;
   return {
     level: LEVELS.some(item => item.id === value.level) ? value.level : DEFAULT_PREFERENCES.level,
     difficulty: DIFFICULTIES.some(item => item.id === difficulty) ? difficulty : DEFAULT_PREFERENCES.difficulty,

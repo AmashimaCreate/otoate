@@ -5,6 +5,35 @@ import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositi
 
 const at = (string, fret) => ({ id: `${string}-${fret}`, string, fret, midi: midiFor(string, fret), pc: midiFor(string, fret) % 12 });
 const sequence = values => { let index = 0; return () => values[index++ % values.length]; };
+const pitches = exercise => exercise.target.map(note => note.midi);
+const spanOf = exercise => Math.max(...pitches(exercise)) - Math.min(...pitches(exercise));
+const seeded = seed => () => {
+  seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+  return seed / 0x100000000;
+};
+
+function assertExercise(exercise, level, difficulty, range) {
+  assert.equal(exercise.level, level.id);
+  assert.equal(exercise.difficulty, difficulty.id);
+  assert.equal(exercise.range, range.id);
+  assert.equal(exercise.target.length, level.length);
+  assert.equal(exercise.positions.length, range.strings.length * (range.maxFret + 1));
+  for (const [index, note] of exercise.target.entries()) {
+    assert.ok(range.strings.includes(note.string));
+    assert.ok(note.fret >= 0 && note.fret <= range.maxFret);
+    assert.equal(note.midi, midiFor(note.string, note.fret));
+    assert.equal(note.pc, note.midi % 12);
+    if (index) assert.notEqual(note.midi, exercise.target[index - 1].midi);
+  }
+  if (level.length > 1) {
+    const pool = exercise.positions.map(note => note.midi);
+    const availableSpan = Math.max(...pool) - Math.min(...pool);
+    const minSpan = Math.min(difficulty.minSpan, availableSpan);
+    const maxSpan = Math.min(difficulty.maxSpan, availableSpan);
+    assert.ok(spanOf(exercise) >= minSpan && spanOf(exercise) <= maxSpan,
+      `${difficulty.id}/${level.id}/${range.id}: ${pitches(exercise)} has span ${spanOf(exercise)}, expected ${minSpan}–${maxSpan}`);
+  }
+}
 
 test('grading accepts the same absolute pitch on another string and rejects an octave', () => {
   const target = [at(6, 8)]; // C3 also lies at 5th-string fret 3.
@@ -25,83 +54,96 @@ test('partial, extra, invalid and reordered answers cannot complete a correct ph
   assert.deepEqual(gradeAnswer(null, null), { correct: false, complete: false, matches: [] });
 });
 
-test('every note count and difficulty stays inside its range with non-repeating consecutive pitches', () => {
+test('seeded random questions meet actual pitch-span bounds across every note count, difficulty and range', () => {
   for (const difficulty of DIFFICULTIES) {
     for (const range of RANGES) {
       for (const level of LEVELS) {
-        for (const value of [0, 0.17, 0.5, 0.86, 0.99999, 1]) {
-          const exercise = makeExercise({ level: level.id, difficulty: difficulty.id, range: range.id, rng: () => value });
-          assert.equal(exercise.level, level.id);
-          assert.equal(exercise.difficulty, difficulty.id);
-          assert.equal(exercise.range, range.id);
-          assert.equal(exercise.target.length, level.length);
-          assert.equal(exercise.positions.length, range.strings.length * (range.maxFret + 1));
-          for (const [index, note] of exercise.target.entries()) {
-            assert.ok(range.strings.includes(note.string));
-            assert.ok(note.fret >= 0 && note.fret <= range.maxFret);
-            assert.equal(note.midi, midiFor(note.string, note.fret));
-            assert.equal(note.pc, note.midi % 12);
-            if (index) {
-              const distance = Math.abs(note.midi - exercise.target[index - 1].midi);
-              assert.ok(distance >= 1 && distance <= difficulty.maxLeap);
-            }
-          }
+        const rng = seeded(0x0a70a7e);
+        let previous = [];
+        for (let iteration = 0; iteration < 100; iteration++) {
+          const exercise = makeExercise({ level: level.id, difficulty: difficulty.id, range: range.id, previous, rng });
+          assertExercise(exercise, level, difficulty, range);
+          assert.notDeepEqual(pitches(exercise), previous.map(note => note.midi));
+          previous = exercise.target;
         }
       }
     }
   }
 });
 
-test('three frozen difficulty presets expand pitch range and phrase leaps independently of note count', () => {
+test('three frozen difficulty presets change audible phrase spans on the same full fretboard', () => {
   assert.equal(Object.isFrozen(DIFFICULTIES), true);
   assert.deepEqual(DIFFICULTIES, [
-    { id: 'easy', label: 'かんたん', range: 'low', maxLeap: 5 },
-    { id: 'normal', label: 'ふつう', range: 'full', maxLeap: 12 },
-    { id: 'hard', label: 'むずかしい', range: 'extended', maxLeap: 46 },
+    { id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 12 },
+    { id: 'normal', label: 'ふつう', minSpan: 13, maxSpan: 24 },
+    { id: 'hard', label: 'むずかしい', minSpan: 25, maxSpan: 46 },
   ]);
   for (const difficulty of DIFFICULTIES) {
     assert.equal(Object.isFrozen(difficulty), true);
-    const bounds = RANGES.find(range => range.id === difficulty.range);
     for (const level of LEVELS) {
       const exercise = makeExercise({ difficulty: difficulty.id, level: level.id, rng: sequence([0, 1]) });
       assert.equal(exercise.difficulty, difficulty.id);
-      assert.equal(exercise.range, difficulty.range);
+      assert.equal(exercise.range, 'extended');
       assert.equal(exercise.target.length, level.length);
-      assert.equal(exercise.positions.length, 6 * (bounds.maxFret + 1));
-      if (level.length > 1) assert.equal(exercise.target[1].midi - exercise.target[0].midi, difficulty.maxLeap);
+      assert.equal(exercise.positions.length, 138);
+      if (level.length > 1) assert.equal(spanOf(exercise), difficulty.minSpan);
     }
     const lowest = makeExercise({ difficulty: difficulty.id, rng: () => 0 }).target[0].midi;
     const highest = makeExercise({ difficulty: difficulty.id, rng: () => 1 }).target[0].midi;
     assert.equal(lowest, 40);
-    assert.equal(highest, 64 + bounds.maxFret);
+    assert.equal(highest, 86);
   }
   assert.deepEqual(makeExercise().difficulty, 'normal');
-  assert.deepEqual(makeExercise().range, 'full');
-  const wide = makeExercise({ difficulty: 'hard', level: 'phrase', rng: sequence([0, 1]) });
-  assert.deepEqual(wide.target.map(note => note.midi), [40, 86, 40, 86]);
+  assert.deepEqual(makeExercise().range, 'extended');
 });
 
-test('range overrides remain supported and unknown ranges fall back to the selected difficulty', () => {
+test('every advertised span is actually attainable, including low E2 to high D6', () => {
   for (const difficulty of DIFFICULTIES) {
-    assert.equal(makeExercise({ difficulty: difficulty.id, range: 'invalid' }).range, difficulty.range);
+    const count = difficulty.maxSpan - difficulty.minSpan + 1;
+    for (const level of LEVELS.filter(item => item.length > 1)) {
+      for (let span = difficulty.minSpan; span <= difficulty.maxSpan; span++) {
+        let calls = 0;
+        const rng = () => calls++ === 0 ? (span - difficulty.minSpan + 0.5) / count : 0;
+        const exercise = makeExercise({ difficulty: difficulty.id, level: level.id, rng });
+        assert.equal(spanOf(exercise), span);
+        assert.equal(Math.min(...pitches(exercise)), 40);
+        assert.equal(Math.max(...pitches(exercise)), 40 + span);
+      }
+    }
+  }
+});
+
+test('explicit range overrides clamp unattainable spans; unknown ranges always use the full board', () => {
+  for (const difficulty of DIFFICULTIES) {
+    assert.equal(makeExercise({ difficulty: difficulty.id, range: 'invalid' }).range, 'extended');
     assert.equal(makeExercise({ difficulty: difficulty.id, range: 'first' }).range, 'first');
+    for (const level of LEVELS.filter(item => item.length > 1)) {
+      const exercise = makeExercise({ difficulty: difficulty.id, level: level.id, range: 'first', rng: () => 1 });
+      assert.equal(spanOf(exercise), 5);
+    }
   }
   assert.equal(makeExercise({ difficulty: 'invalid' }).difficulty, 'normal');
-  assert.equal(makeExercise({ difficulty: 'invalid' }).range, 'full');
+  assert.equal(makeExercise({ difficulty: 'invalid' }).range, 'extended');
 });
 
-test('every distinct chromatic pitch remains equally selectable in each range', () => {
+test('single-note questions sample each distinct pitch equally at every difficulty', () => {
   for (const range of RANGES) {
     const positions = allPositions(range);
     const distinct = [...new Set(positions.map(position => position.midi))].sort((a, b) => a - b);
     if (range.id !== 'first') assert.ok(positions.length > distinct.length);
-    const selected = distinct.map((_, index) => makeExercise({ range: range.id, rng: () => (index + 0.5) / distinct.length }).target[0].midi);
-    assert.deepEqual(selected, distinct);
+    for (const difficulty of DIFFICULTIES) {
+      const selected = distinct.map((_, index) => makeExercise({ difficulty: difficulty.id, range: range.id, rng: () => (index + 0.5) / distinct.length }).target[0].midi);
+      assert.deepEqual(selected, distinct);
+      const previous = distinct[Math.floor(distinct.length / 2)];
+      const remaining = distinct.filter(midi => midi !== previous);
+      const next = remaining.map((_, index) => makeExercise({ difficulty: difficulty.id, range: range.id, previous: [previous], rng: () => (index + 0.5) / remaining.length }).target[0].midi);
+      assert.deepEqual(next, remaining);
+    }
     assert.deepEqual(distinct, Array.from({ length: distinct.length }, (_, index) => distinct[0] + index));
   }
 });
 
-test('an exercise avoids the preceding entire phrase even with deterministic random input', () => {
+test('constant, extreme and invalid RNG values terminate and avoid the entire previous phrase without violating span bounds', () => {
   for (const difficulty of DIFFICULTIES) {
     for (const range of RANGES) {
       for (const level of LEVELS) {
@@ -109,9 +151,13 @@ test('an exercise avoids the preceding entire phrase even with deterministic ran
         const first = makeExercise({ ...options, rng: sequence([0.35, 0.71, 0.17, 0.48]) });
         const second = makeExercise({ ...options, previous: first.target, rng: sequence([0.35, 0.71, 0.17, 0.48]) });
         assert.notDeepEqual(second.target.map(note => note.midi), first.target.map(note => note.midi));
-        const repeatedRng = makeExercise({ ...options, rng: () => 0 });
-        const replacement = makeExercise({ ...options, previous: repeatedRng.target.map(note => note.midi), rng: () => 0 });
-        assert.notDeepEqual(replacement.target.map(note => note.midi), repeatedRng.target.map(note => note.midi));
+        for (const value of [0, 0.17, 0.5, 0.86, 0.99999, 1, -8, 8, NaN, Infinity, -Infinity, undefined, '0.5']) {
+          const repeatedRng = makeExercise({ ...options, rng: () => value });
+          const replacement = makeExercise({ ...options, previous: pitches(repeatedRng), rng: () => value });
+          assert.notDeepEqual(pitches(replacement), pitches(repeatedRng));
+          assertExercise(repeatedRng, level, difficulty, range);
+          assertExercise(replacement, level, difficulty, range);
+        }
       }
     }
   }
@@ -146,7 +192,7 @@ test('extended ear range exposes all 22 frets and can generate every pitch above
     assert.deepEqual(sampled.target, [at(1, midi - 64)]);
   }
   assert.equal(makeExercise({ range: 'full' }).positions.length, 78);
-  assert.equal(makeExercise().range, 'full');
+  assert.equal(makeExercise().range, 'extended');
 });
 
 test('grading and equivalent positions work above 12F while still rejecting other octaves', () => {
@@ -173,14 +219,12 @@ test('grading and equivalent positions work above 12F while still rejecting othe
 test('unknown settings use defaults and returned targets do not alias their position pool', () => {
   const exercise = makeExercise({ level: 'unknown', range: 'unknown', rng: () => NaN });
   assert.equal(exercise.level, 'single');
-  assert.equal(exercise.range, 'full');
+  assert.equal(exercise.range, 'extended');
   assert.equal(exercise.difficulty, 'normal');
   const original = exercise.positions.find(position => position.id === exercise.target[0].id);
   exercise.target[0].fret = 99;
   assert.notEqual(original.fret, 99);
 });
-
-const pitches = exercise => exercise.target.map(note => note.midi);
 
 test('legacy scale and tonic arguments never affect random exercises or their previous-phrase exclusion', () => {
   const randomValues = [0.13, 0.86, 0.31, 0.67];
@@ -199,7 +243,6 @@ test('legacy scale and tonic arguments never affect random exercises or their pr
       }
     }
   }
-  assert.deepEqual(pitches(makeExercise({ level: 'phrase', difficulty: 'easy', rng: () => 0.4 })), [52, 51, 50, 49]);
 });
 
 test('random phrase positions never alias the position pool or repeated occurrences', () => {

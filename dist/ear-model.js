@@ -16,9 +16,9 @@ export const RANGES = Object.freeze([
 ]);
 
 export const DIFFICULTIES = Object.freeze([
-  Object.freeze({ id: 'easy', label: 'かんたん', range: 'low', maxLeap: 5 }),
-  Object.freeze({ id: 'normal', label: 'ふつう', range: 'full', maxLeap: 12 }),
-  Object.freeze({ id: 'hard', label: 'むずかしい', range: 'extended', maxLeap: 46 }),
+  Object.freeze({ id: 'easy', label: 'かんたん', minSpan: 1, maxSpan: 12 }),
+  Object.freeze({ id: 'normal', label: 'ふつう', minSpan: 13, maxSpan: 24 }),
+  Object.freeze({ id: 'hard', label: 'むずかしい', minSpan: 25, maxSpan: 46 }),
 ]);
 
 function pitch(value) {
@@ -38,10 +38,22 @@ function pick(items, rng) {
   return items[Math.min(items.length - 1, Math.floor(unit * items.length))];
 }
 
+function phraseOrderings(notes, prefix = []) {
+  if (!notes.length) return [prefix];
+  const orderings = [];
+  const used = new Set();
+  for (const [index, midi] of notes.entries()) {
+    if (midi === prefix.at(-1) || used.has(midi)) continue;
+    used.add(midi);
+    orderings.push(...phraseOrderings(notes.filter((_, i) => i !== index), [...prefix, midi]));
+  }
+  return orderings;
+}
+
 export function makeExercise({ level = 'single', difficulty = 'normal', range, previous = [], rng = Math.random } = {}) {
   const noteCount = LEVELS.find(item => item.id === level) || LEVELS[0];
   const preset = DIFFICULTIES.find(item => item.id === difficulty) || DIFFICULTIES[1];
-  const bounds = RANGES.find(item => item.id === range) || RANGES.find(item => item.id === preset.range);
+  const bounds = RANGES.find(item => item.id === range) || RANGES.find(item => item.id === 'extended');
   const positions = allPositions(bounds);
   // Each pitch gets one lottery entry, even when it occurs on several strings.
   const byPitch = new Map();
@@ -51,20 +63,37 @@ export function makeExercise({ level = 'single', difficulty = 'normal', range, p
   const midis = [...byPitch.keys()].sort((a, b) => a - b);
   const prior = Array.isArray(previous) ? previous.map(pitch) : [];
   const random = typeof rng === 'function' ? rng : Math.random;
-  const target = [];
-  for (let index = 0; index < noteCount.length; index += 1) {
-    const last = target.at(-1)?.midi;
-    let candidates = last === undefined ? midis : midis.filter(midi => midi !== last && Math.abs(midi - last) <= preset.maxLeap);
-    if (!candidates.length) candidates = midis;
-    // Exclude a complete repeat only at its final note. No retry loop is needed,
-    // so even a deterministic RNG terminates and produces a different exercise.
-    if (index === noteCount.length - 1 && prior.length === noteCount.length
-      && target.every((position, i) => position.midi === prior[i])) {
-      const alternatives = candidates.filter(midi => midi !== prior[index]);
-      if (alternatives.length) candidates = alternatives;
+  let selected;
+  if (noteCount.length === 1) {
+    const candidates = prior.length === 1 ? midis.filter(midi => midi !== prior[0]) : midis;
+    selected = [pick(candidates.length ? candidates : midis, random)];
+  } else {
+    // Choose the audible span itself, then include both endpoints. A maximum
+    // leap alone would still allow most questions to stay inside one octave.
+    const availableSpan = midis.at(-1) - midis[0];
+    const minSpan = Math.min(preset.minSpan, availableSpan);
+    const maxSpan = Math.min(preset.maxSpan, availableSpan);
+    const spans = Array.from({ length: maxSpan - minSpan + 1 }, (_, index) => minSpan + index);
+    const span = pick(spans, random);
+    const low = pick(midis.filter(midi => byPitch.has(midi + span)), random);
+    const high = low + span;
+    const inside = midis.filter(midi => midi >= low && midi <= high);
+    const notes = [low, high];
+    while (notes.length < noteCount.length) {
+      notes.push(pick(inside.filter(midi => midi !== notes.at(-1)), random));
     }
-    target.push({ ...byPitch.get(pick(candidates, random)) });
+    // At most 24 permutations for four notes: bounded work, no rejection loop.
+    // Shuffling avoids always revealing the span in the first two notes.
+    const orderings = phraseOrderings(notes);
+    const alternatives = orderings.filter(order => order.length !== prior.length || order.some((midi, index) => midi !== prior[index]));
+    selected = pick(alternatives.length ? alternatives : orderings, random);
+    if (!alternatives.length) {
+      // A three-note [low, high, low] phrase can have only one valid ordering.
+      // Swapping its endpoints preserves the span and prevents an exact repeat.
+      selected = selected.map(midi => midi === low ? high : midi === high ? low : midi);
+    }
   }
+  const target = selected.map(midi => ({ ...byPitch.get(midi) }));
   return { target, positions, level: noteCount.id, difficulty: preset.id, range: bounds.id };
 }
 

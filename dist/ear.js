@@ -1,8 +1,8 @@
 import { noteName, midiFor } from './pitch.js';
 import { GuitarAudio } from './audio.js';
-import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js';
+import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js?v=20261013-pitch-span';
 import { runSequence } from './ear-playback.js';
-import { loadPreferences, savePreferences } from './ear-preferences.js';
+import { loadPreferences, savePreferences } from './ear-preferences.js?v=20261013-pitch-span';
 
 const $ = selector => document.querySelector(selector);
 const guitar = new GuitarAudio();
@@ -10,7 +10,8 @@ const pitch = p => `${noteName(p.pc)}${Math.floor(p.midi / 12) - 1}`;
 const location = p => `${p.string}弦 ${p.fret === 0 ? '開放' : `${p.fret}F`}`;
 const preferences = loadPreferences();
 let { level, difficulty, boardView } = preferences;
-let range;
+// Difficulty changes the audible question span, never the playable fretboard.
+const range = 'extended';
 let exercise, draft = [], cursor = 0, edits = [];
 let heard = false, attempts = 0, settled = false, results = null;
 let focusId = '1-0', completed = 0, clean = 0;
@@ -115,8 +116,7 @@ function playNotes(notes, isPrompt = false) {
 function newExercise({ play = false } = {}) {
   const previous = exercise?.target || [];
   stop();
-  exercise = makeExercise({ level, difficulty, previous });
-  range = exercise.range;
+  exercise = makeExercise({ level, difficulty, range, previous });
   difficulty = exercise.difficulty;
   exercise.beats = Array(exercise.target.length).fill(1);
   draft = Array(exercise.target.length).fill(null);

@@ -316,20 +316,24 @@ test('a cancelled pending audio success does not clear the current error', async
   assert.equal(app.get('playback-status').textContent, '');
 });
 
-test('difficulty changes cancel playback, update the fret range and keep note count, view and scores', async () => {
+test('difficulty changes the audible span, cancels playback and preserves the fretboard, note count, view and scores', async () => {
   const app = screen('triple');
   assert.equal(app.get('difficulty-select').value, 'normal');
+  const boardPositions = app.exercise.positions;
   await app.enter(app.target[0]);
   await app.click('compare');
-  for (const [difficulty, range, maxFret] of [['hard', 'extended', 22], ['easy', 'low', 5], ['normal', 'full', 12]]) {
+  for (const [difficulty, minSpan, maxSpan] of [['hard', 25, 46], ['easy', 1, 12], ['normal', 13, 24]]) {
     const completed = app.get('completed-count').textContent;
     await app.changeDifficulty(difficulty);
     assert.equal(app.exercise.difficulty, difficulty);
-    assert.equal(app.exercise.range, range);
+    assert.equal(app.exercise.range, 'extended');
     assert.equal(app.exercise.level, 'triple');
     assert.equal(app.target.length, 3);
-    assert.equal(Math.max(...app.exercise.positions.map(p => p.fret)), maxFret);
-    assert.equal(app.get('fretboard').dataset.maxFret, maxFret);
+    assert.deepEqual(app.exercise.positions, boardPositions);
+    assert.equal(app.get('fretboard').dataset.maxFret, 22);
+    const targetMidis = app.target.map(p => p.midi);
+    const span = Math.max(...targetMidis) - Math.min(...targetMidis);
+    assert.ok(span >= minSpan && span <= maxSpan, `${difficulty} question spans ${span} semitones`);
     assert.equal(app.get('completed-count').textContent, completed);
     assert.equal(app.get('playback-status').textContent, '');
     assert.equal(app.get('check').disabled, true);
@@ -345,4 +349,20 @@ test('difficulty changes cancel playback, update the fret range and keep note co
   for (const position of app.target) await app.enter(position);
   await app.click('check');
   assert.equal(app.get('feedback-title').textContent, '正解');
+});
+
+test('the audio player receives the full question span for every multi-note difficulty', async () => {
+  for (const level of ['pair', 'triple', 'phrase']) {
+    const app = screen(level);
+    for (const [difficulty, minSpan, maxSpan] of [['easy', 1, 12], ['normal', 13, 24], ['hard', 25, 46]]) {
+      await app.changeDifficulty(difficulty);
+      app.played.length = 0;
+      await app.click('listen');
+      await app.finishPlayback();
+      assert.deepEqual(app.played, app.target.map(p => p.midi), 'playback must not fold target pitches into one octave');
+      const span = Math.max(...app.played) - Math.min(...app.played);
+      assert.ok(span >= minSpan && span <= maxSpan, `${level}/${difficulty} actually plays ${span} semitones`);
+      assert.equal(app.get('fretboard').dataset.maxFret, 22);
+    }
+  }
 });

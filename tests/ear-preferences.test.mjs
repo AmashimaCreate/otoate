@@ -68,13 +68,13 @@ test('legacy musical settings are discarded while other saved preferences surviv
   }
 });
 
-test('legacy ranges migrate only when difficulty is absent and are never saved again', () => {
+test('legacy fretboard ranges never determine listening difficulty and are not saved again', () => {
   const storage = memoryStorage();
   assert.equal(DEFAULT_PREFERENCES.difficulty, 'normal');
   assert.equal('range' in DEFAULT_PREFERENCES, false);
-  for (const [range, difficulty] of [['first', 'easy'], ['low', 'easy'], ['full', 'normal'], ['extended', 'hard'], ['invalid', 'normal']]) {
+  for (const range of ['first', 'low', 'full', 'extended', 'invalid']) {
     const legacy = { level: 'triple', range, volume: 0.6, speed: 0.7, boardView: 'overview' };
-    const expected = { level: 'triple', difficulty, volume: 0.6, speed: 0.7, boardView: 'overview' };
+    const expected = { level: 'triple', difficulty: 'normal', volume: 0.6, speed: 0.7, boardView: 'overview' };
     assert.deepEqual(sanitizePreferences(legacy), expected);
     storage.setItem(KEY, JSON.stringify(legacy));
     assert.deepEqual(loadPreferences(storage), expected);
