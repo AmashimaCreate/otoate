@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { noteName, midiFor } from '../dist/engine.js';
-import { LEVELS, RANGES, makeExercise, gradeAnswer, matchingPositions } from '../dist/ear-model.js';
+import { noteName, midiFor } from '../dist/pitch.js';
+import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from '../dist/ear-model.js';
 import { runSequence } from '../dist/ear-playback.js';
 
 const html = readFileSync(new URL('../dist/ear.html', import.meta.url), 'utf8');
@@ -41,14 +41,14 @@ function screen(level = 'phrase', { audioWorks = true } = {}) {
     querySelectorAll: selector => selector === '[data-board-view]' ? views : [],
     addEventListener() {},
   };
-  const waits = [], played = [];
+  const waits = [], played = [], saved = [];
   let currentExercise;
   runInNewContext(controller, {
     document, window: { addEventListener() {} },
-    noteName, midiFor, LEVELS, RANGES, gradeAnswer, matchingPositions,
+    noteName, midiFor, LEVELS, RANGES, DIFFICULTIES, gradeAnswer, matchingPositions,
     makeExercise: options => (currentExercise = makeExercise({ ...options, rng: () => 0.3 })),
-    loadPreferences: () => ({ level, range: 'full', boardView: 'overview', volume: 0.45, speed: 1 }),
-    savePreferences: () => true,
+    loadPreferences: () => ({ level, difficulty: 'normal', boardView: 'overview', volume: 0.45, speed: 1 }),
+    savePreferences: preferences => { saved.push({ ...preferences }); return true; },
     GuitarAudio: class {
       stop() {}
       async play(midi) { played.push(midi); return typeof audioWorks === 'function' ? audioWorks() : audioWorks; }
@@ -63,8 +63,10 @@ function screen(level = 'phrase', { audioWorks = true } = {}) {
     await flush();
   }
   return {
-    get, click, played,
+    get, click, played, saved,
+    get exercise() { return currentExercise; },
     get target() { return currentExercise.target; },
+    async changeDifficulty(value) { get('difficulty-select').value = value; get('difficulty-select').handlers.change(); await flush(); },
     async enter(position) {
       await click('fretboard', { closest: () => ({ dataset: { position: position.id }, disabled: false }) });
     },
@@ -312,4 +314,35 @@ test('a cancelled pending audio success does not clear the current error', async
   await flush();
   assert.equal(app.get('feedback-title').textContent, '音を再生できません');
   assert.equal(app.get('playback-status').textContent, '');
+});
+
+test('difficulty changes cancel playback, update the fret range and keep note count, view and scores', async () => {
+  const app = screen('triple');
+  assert.equal(app.get('difficulty-select').value, 'normal');
+  await app.enter(app.target[0]);
+  await app.click('compare');
+  for (const [difficulty, range, maxFret] of [['hard', 'extended', 22], ['easy', 'low', 5], ['normal', 'full', 12]]) {
+    const completed = app.get('completed-count').textContent;
+    await app.changeDifficulty(difficulty);
+    assert.equal(app.exercise.difficulty, difficulty);
+    assert.equal(app.exercise.range, range);
+    assert.equal(app.exercise.level, 'triple');
+    assert.equal(app.target.length, 3);
+    assert.equal(Math.max(...app.exercise.positions.map(p => p.fret)), maxFret);
+    assert.equal(app.get('fretboard').dataset.maxFret, maxFret);
+    assert.equal(app.get('completed-count').textContent, completed);
+    assert.equal(app.get('playback-status').textContent, '');
+    assert.equal(app.get('check').disabled, true);
+    assert.equal(app.get('compare').disabled, true);
+    assert.deepEqual(answerVerdicts(app), [null, null, null]);
+    assert.equal(app.saved.at(-1).difficulty, difficulty);
+    assert.equal(app.saved.at(-1).boardView, 'overview');
+    assert.equal(app.saved.at(-1).level, 'triple');
+    const playedBefore = app.played.length;
+    await app.finishPlayback();
+    assert.equal(app.played.length, playedBefore, 'cancelled playback cannot sound after a change');
+  }
+  for (const position of app.target) await app.enter(position);
+  await app.click('check');
+  assert.equal(app.get('feedback-title').textContent, '正解');
 });

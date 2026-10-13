@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_PREFERENCES, sanitizePreferences, loadPreferences, savePreferences } from '../dist/ear-preferences.js';
 
-const KEY = 'fret-atlas.ear-preferences.v1';
+const KEY = 'guitar-ear-training.preferences.v1';
 const memoryStorage = () => {
   const values = new Map();
   return {
@@ -12,23 +12,23 @@ const memoryStorage = () => {
 };
 
 test('preferences keep supported options and exclude unknown fields', () => {
-  const valid = { level: 'phrase', range: 'full', volume: 0.65, speed: 0.7, boardView: 'overview' };
+  const valid = { level: 'phrase', difficulty: 'normal', volume: 0.65, speed: 0.7, boardView: 'overview' };
   assert.deepEqual(sanitizePreferences({ ...valid, target: [64], answers: 20 }), valid);
   for (const level of ['single', 'pair', 'triple', 'phrase']) {
-    for (const range of ['first', 'low', 'full', 'extended']) {
-      assert.deepEqual(sanitizePreferences({ level, range }), { ...DEFAULT_PREFERENCES, level, range });
+    for (const difficulty of ['easy', 'normal', 'hard']) {
+      assert.deepEqual(sanitizePreferences({ level, difficulty }), { ...DEFAULT_PREFERENCES, level, difficulty });
     }
   }
-  assert.deepEqual(sanitizePreferences({ level: 'unknown', range: 'unknown', speed: 2 }), DEFAULT_PREFERENCES);
+  assert.deepEqual(sanitizePreferences({ level: 'unknown', difficulty: 'unknown', speed: 2 }), DEFAULT_PREFERENCES);
   assert.deepEqual(sanitizePreferences(JSON.parse('{"__proto__":{"polluted":true},"level":"pair"}')), { ...DEFAULT_PREFERENCES, level: 'pair' });
   assert.equal({}.polluted, undefined);
   assert.equal(Object.isFrozen(DEFAULT_PREFERENCES), true);
 });
 
-test('board views and extended range survive saving and loading without changing practice settings', () => {
+test('board views and difficulty survive saving and loading without changing practice settings', () => {
   const storage = memoryStorage();
   for (const boardView of ['detail', 'overview']) {
-    const preferences = { ...DEFAULT_PREFERENCES, range: 'extended', boardView };
+    const preferences = { ...DEFAULT_PREFERENCES, difficulty: 'hard', boardView };
     assert.deepEqual(sanitizePreferences(preferences), preferences);
     assert.equal(savePreferences(preferences, storage), true);
     assert.deepEqual(JSON.parse(storage.getItem(KEY)), preferences);
@@ -41,8 +41,8 @@ test('missing and malformed board views fall back to detail on sanitize, load, a
   assert.equal(DEFAULT_PREFERENCES.boardView, 'detail');
   const storage = memoryStorage();
   for (const boardView of [undefined, null, '', 'wide', 'DETAIL', 1, true, ['overview'], { view: 'overview' }]) {
-    const input = { level: 'pair', range: 'extended', boardView };
-    const expected = { ...DEFAULT_PREFERENCES, level: 'pair', range: 'extended', boardView: 'detail' };
+    const input = { level: 'pair', difficulty: 'hard', boardView };
+    const expected = { ...DEFAULT_PREFERENCES, level: 'pair', difficulty: 'hard', boardView: 'detail' };
     assert.deepEqual(sanitizePreferences(input), expected);
     storage.setItem(KEY, JSON.stringify(input));
     assert.deepEqual(loadPreferences(storage), expected);
@@ -53,7 +53,7 @@ test('missing and malformed board views fall back to detail on sanitize, load, a
 
 test('legacy musical settings are discarded while other saved preferences survive', () => {
   const storage = memoryStorage();
-  const expected = { level: 'phrase', range: 'extended', volume: 0.65, speed: 0.7, boardView: 'overview' };
+  const expected = { level: 'phrase', difficulty: 'hard', volume: 0.65, speed: 0.7, boardView: 'overview' };
   assert.equal('style' in DEFAULT_PREFERENCES, false);
   assert.equal('tonic' in DEFAULT_PREFERENCES, false);
   for (const style of ['chromatic', 'major', 'pentatonic', 'blues', 'unknown']) {
@@ -65,6 +65,30 @@ test('legacy musical settings are discarded while other saved preferences surviv
       assert.equal(savePreferences(legacy, storage), true);
       assert.deepEqual(JSON.parse(storage.getItem(KEY)), expected);
     }
+  }
+});
+
+test('legacy ranges migrate only when difficulty is absent and are never saved again', () => {
+  const storage = memoryStorage();
+  assert.equal(DEFAULT_PREFERENCES.difficulty, 'normal');
+  assert.equal('range' in DEFAULT_PREFERENCES, false);
+  for (const [range, difficulty] of [['first', 'easy'], ['low', 'easy'], ['full', 'normal'], ['extended', 'hard'], ['invalid', 'normal']]) {
+    const legacy = { level: 'triple', range, volume: 0.6, speed: 0.7, boardView: 'overview' };
+    const expected = { level: 'triple', difficulty, volume: 0.6, speed: 0.7, boardView: 'overview' };
+    assert.deepEqual(sanitizePreferences(legacy), expected);
+    storage.setItem(KEY, JSON.stringify(legacy));
+    assert.deepEqual(loadPreferences(storage), expected);
+    assert.equal(savePreferences(legacy, storage), true);
+    assert.deepEqual(JSON.parse(storage.getItem(KEY)), expected);
+    assert.equal('range' in loadPreferences(storage), false);
+  }
+  for (const difficulty of ['easy', 'normal', 'hard']) {
+    for (const range of ['first', 'low', 'full', 'extended']) {
+      assert.equal(sanitizePreferences({ difficulty, range }).difficulty, difficulty);
+    }
+  }
+  for (const difficulty of [undefined, null, '', 'invalid', 3, true, [], {}]) {
+    assert.equal(sanitizePreferences({ difficulty, range: 'extended' }).difficulty, 'normal');
   }
 });
 
@@ -95,9 +119,9 @@ test('missing, malformed and corrupted stored settings safely load defaults', ()
 
 test('save uses the dedicated key and sanitizes the persisted payload', () => {
   const storage = memoryStorage();
-  assert.equal(savePreferences({ level: 'pair', range: 'full', volume: 8, speed: 0.7, extra: 1 }, storage), true);
-  assert.deepEqual(JSON.parse(storage.getItem(KEY)), { ...DEFAULT_PREFERENCES, level: 'pair', range: 'full', volume: 0.8, speed: 0.7 });
-  assert.deepEqual(loadPreferences(storage), { ...DEFAULT_PREFERENCES, level: 'pair', range: 'full', volume: 0.8, speed: 0.7 });
+  assert.equal(savePreferences({ level: 'pair', difficulty: 'hard', volume: 8, speed: 0.7, extra: 1 }, storage), true);
+  assert.deepEqual(JSON.parse(storage.getItem(KEY)), { ...DEFAULT_PREFERENCES, level: 'pair', difficulty: 'hard', volume: 0.8, speed: 0.7 });
+  assert.deepEqual(loadPreferences(storage), { ...DEFAULT_PREFERENCES, level: 'pair', difficulty: 'hard', volume: 0.8, speed: 0.7 });
   const loaded = loadPreferences(storage);
   loaded.level = 'single';
   assert.equal(loadPreferences(storage).level, 'pair');

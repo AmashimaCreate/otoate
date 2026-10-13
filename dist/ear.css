@@ -39,8 +39,6 @@ h1 { font-size: 28px; }
 main { padding: 4px 0 12px; }
 .app-header { min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-block: 6px; }
 .page-heading { display: flex; align-items: center; gap: 4px; }
-.back-link { color: var(--muted); }
-.back-link:hover { background: #ffffff0b; }
 .header-actions { display: flex; align-items: center; gap: 12px; }
 .session-record { display: flex; align-items: baseline; gap: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .session-record strong { color: var(--text); font-weight: 600; }
@@ -56,6 +54,7 @@ h1 { line-height: 1.3; font-weight: 620; letter-spacing: -.8px; }
 .trainer { background: var(--panel); border: 1px solid var(--border); border-radius: 17px; overflow: hidden; }
 .prompt-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; padding: 12px 18px; }
 .prompt-topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; flex: 1; gap: 8px; }
+.difficulty-select { min-height: 44px; min-width: 132px; max-width: 100%; margin-left: auto; padding: 7px 9px; border: 1px solid #4b5658; border-radius: 8px; color: var(--text); background: #293032; font-size: 18px; cursor: pointer; }
 .question-label { line-height: 1.3; font-weight: 550; letter-spacing: .7px; color: var(--muted); margin-bottom: 7px; }
 .prompt-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .prompt-meta .question-label { margin: 0; }

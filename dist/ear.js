@@ -1,6 +1,6 @@
-import { noteName, midiFor } from './engine.js';
+import { noteName, midiFor } from './pitch.js';
 import { GuitarAudio } from './audio.js';
-import { LEVELS, RANGES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js';
+import { LEVELS, RANGES, DIFFICULTIES, makeExercise, gradeAnswer, matchingPositions } from './ear-model.js';
 import { runSequence } from './ear-playback.js';
 import { loadPreferences, savePreferences } from './ear-preferences.js';
 
@@ -9,7 +9,8 @@ const guitar = new GuitarAudio();
 const pitch = p => `${noteName(p.pc)}${Math.floor(p.midi / 12) - 1}`;
 const location = p => `${p.string}弦 ${p.fret === 0 ? '開放' : `${p.fret}F`}`;
 const preferences = loadPreferences();
-let { level, range, boardView } = preferences;
+let { level, difficulty, boardView } = preferences;
+let range;
 let exercise, draft = [], cursor = 0, edits = [];
 let heard = false, attempts = 0, settled = false, results = null;
 let focusId = '1-0', completed = 0, clean = 0;
@@ -34,7 +35,7 @@ function clearPlaybackUI() {
 }
 
 function persistPreferences() {
-  Object.assign(preferences, { level, range, boardView, volume: Number($('#volume').value), speed: Number($('#speed-select').value) });
+  Object.assign(preferences, { level, difficulty, boardView, volume: Number($('#volume').value), speed: Number($('#speed-select').value) });
   const saved = savePreferences(preferences);
   $('#settings-storage').textContent = saved ? '' : '設定を保存できません';
   $('#settings-storage').hidden = saved;
@@ -114,7 +115,9 @@ function playNotes(notes, isPrompt = false) {
 function newExercise({ play = false } = {}) {
   const previous = exercise?.target || [];
   stop();
-  exercise = makeExercise({ level, range, previous });
+  exercise = makeExercise({ level, difficulty, previous });
+  range = exercise.range;
+  difficulty = exercise.difficulty;
   exercise.beats = Array(exercise.target.length).fill(1);
   draft = Array(exercise.target.length).fill(null);
   cursor = 0; heard = false; attempts = 0; settled = false; results = null; edits = [];
@@ -122,7 +125,7 @@ function newExercise({ play = false } = {}) {
   focusId = exercise.positions[0].id;
   $('#question-label').textContent = `お題 ${String(completed + 1).padStart(2, '0')}`;
   $('#prompt-beats').innerHTML = Array.from({ length: draft.length }, (_, i) => `<span data-beat="${i}"></span>`).join('');
-  $('#range-select').value = range;
+  $('#difficulty-select').value = difficulty;
   $('#touched-note').textContent = '';
   $('#answer-key').hidden = true;
   $('#answer-key').replaceChildren();
@@ -351,10 +354,10 @@ document.querySelectorAll('[data-level]').forEach(button => button.addEventListe
   newExercise();
   persistPreferences();
 }));
-$('#range-select').addEventListener('change', () => {
-  const selected = $('#range-select').value;
-  if (!RANGES.some(item => item.id === selected)) return;
-  range = selected;
+$('#difficulty-select').addEventListener('change', () => {
+  const selected = $('#difficulty-select').value;
+  if (selected === difficulty || !DIFFICULTIES.some(item => item.id === selected)) return;
+  difficulty = selected;
   newExercise();
   persistPreferences();
 });

@@ -8,23 +8,22 @@ import { join } from 'node:path';
 
 const run = promisify(execFile);
 const base = new URL('https://preview.example/projects/guitar-trainer/');
-let fixture, output, originalEar, originalAtlas;
+let fixture, output, originalEar;
 const pages = new Map();
 
 before(async () => {
-  fixture = await mkdtemp(join(tmpdir(), 'fret-atlas-build-'));
+  fixture = await mkdtemp(join(tmpdir(), 'ear-training-build-'));
   output = join(fixture, '_site');
   await Promise.all([
     cp(new URL('../dist/', import.meta.url), join(fixture, 'dist'), { recursive: true }),
     cp(new URL('../scripts/', import.meta.url), join(fixture, 'scripts'), { recursive: true }),
   ]);
   originalEar = await readFile(join(fixture, 'dist/ear.html'), 'utf8');
-  originalAtlas = await readFile(join(fixture, 'dist/index.html'), 'utf8');
   await run(process.execPath, [join(fixture, 'scripts/build.mjs')], {
     cwd: fixture,
     env: { ...process.env, SITE_URL: base.href.slice(0, -1) },
   });
-  for (const name of ['index.html', 'ear.html', 'atlas.html']) {
+  for (const name of ['index.html', 'ear.html']) {
     pages.set(name, await readFile(join(output, name), 'utf8'));
   }
 });
@@ -67,28 +66,28 @@ async function pngDimensions(file) {
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
 }
 
-test('published routes open ear training and keep the separate atlas reachable under a subpath', () => {
+test('published routes open only the standalone ear trainer under a subpath', async () => {
   for (const name of ['index.html', 'ear.html']) {
     const html = pages.get(name);
     const pageURL = new URL(name, base);
     assert.equal(new URL(one(html, 'script', item => item.type === 'module').src, pageURL).pathname,
       new URL('ear.js', base).pathname);
-    const back = one(html, 'a', item => item.class?.split(/\s+/).includes('back-link'));
-    assert.equal(new URL(back.href, pageURL).href, new URL('atlas.html', base).href);
+    assert.equal(elements(html, 'a').length, 0, 'practice must not link to another app');
+    assert.ok(html.includes('<h1>オトアテ</h1>'));
+    assert.doesNotMatch(html, /fret[\s-]?atlas|atlas\.html/i);
   }
-  const atlas = pages.get('atlas.html');
-  assert.equal(new URL(one(atlas, 'script', item => item.type === 'module').src, base).pathname,
-    new URL('app.js', base).pathname);
-  const earLink = one(atlas, 'a', item => item.class?.split(/\s+/).includes('ear-link'));
-  assert.equal(new URL(earLink.href, new URL('atlas.html', base)).href, base.href);
+  for (const legacy of ['atlas.html', 'app.js', 'engine.js', 'journey.js', 'styles.css', 'icon.svg']) {
+    await assert.rejects(stat(join(output, legacy)), { code: 'ENOENT' });
+  }
 });
 
 test('canonical and sharing URLs use the configured public path and image metadata matches the actual thumbnail', async () => {
   for (const [name, html] of pages) {
-    const canonical = name === 'atlas.html' ? new URL(name, base).href : base.href;
+    const canonical = base.href;
     assert.equal(one(html, 'link', item => item.rel === 'canonical').href, canonical);
     assert.equal(meta(html, 'og:url'), canonical);
     assert.equal(meta(html, 'og:type'), 'website');
+    assert.equal(meta(html, 'og:site_name'), 'オトアテ');
     assert.ok(meta(html, 'og:title').length > 0);
     assert.ok(meta(html, 'og:description').length > 0);
     const image = meta(html, 'og:image');
@@ -114,6 +113,8 @@ test('browser and home-screen icons resolve to actual correctly sized assets', a
     assert.deepEqual(await pngDimensions(localFile(new URL(apple.href, pageURL))), { width: 180, height: 180 });
     const manifestURL = new URL(one(html, 'link', item => item.rel === 'manifest').href, pageURL);
     const manifest = JSON.parse(await readFile(localFile(manifestURL), 'utf8'));
+    assert.equal(manifest.name, 'オトアテ');
+    assert.equal(manifest.short_name, 'オトアテ');
     assert.equal(new URL(manifest.start_url, manifestURL).href, base.href);
     assert.equal(new URL(manifest.scope, manifestURL).href, base.href);
     assert.equal(new URL(manifest.id, manifestURL).href, base.href);
@@ -156,10 +157,9 @@ test('local HTML, CSS and module references all resolve inside the deployed proj
 test('search discovery uses the same subpath and building leaves development pages intact', async () => {
   const sitemap = await readFile(join(output, 'sitemap.xml'), 'utf8');
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, value]) => decode(value));
-  assert.deepEqual(locations.sort(), [base.href, new URL('atlas.html', base).href].sort());
+  assert.deepEqual(locations, [base.href]);
   const robots = await readFile(join(output, 'robots.txt'), 'utf8');
   assert.ok(robots.includes(`Sitemap: ${new URL('sitemap.xml', base).href}`));
   assert.ok((await stat(join(output, '.nojekyll'))).isFile());
   assert.equal(await readFile(join(fixture, 'dist/ear.html'), 'utf8'), originalEar);
-  assert.equal(await readFile(join(fixture, 'dist/index.html'), 'utf8'), originalAtlas);
 });
